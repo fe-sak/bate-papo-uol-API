@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import { MongoClient } from 'mongodb';
+import { MongoClient, ObjectId } from 'mongodb';
 import dotenv from 'dotenv';
 import dayjs from 'dayjs';
 import Joi from 'joi';
@@ -40,6 +40,7 @@ app.get('/messages', async (req, res) => {
       .find({
         $or: [
           { type: 'message' },
+          { type: 'status' },
           {
             $or: [
               { type: 'private_message', to: req.headers.user },
@@ -167,3 +168,29 @@ app.post('/status', async (req, res) => {
     mongoClient.close();
   }
 });
+
+async function updateParticipants() {
+  try {
+    await mongoClient.connect();
+    db = mongoClient.db('bate-papo-uol-API');
+
+    let participants = await db.collection('participants').find().toArray();
+
+    participants.forEach((participant) => {
+      if (Date.now() - participant.lastStatus > 10000) {
+        db.collection('participants').deleteOne({ _id: new ObjectId(participant._id) });
+        db.collection('messages').insertOne({
+          from: participant.name,
+          to: 'Todos',
+          text: 'sai da sala...',
+          type: 'status',
+          time: dayjs(Date.now()).format('HH:mm:ss'),
+        });
+      }
+    });
+  } catch (error) {
+    console.log(error);
+  }
+}
+
+setInterval(updateParticipants, 1000);
