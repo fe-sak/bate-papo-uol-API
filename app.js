@@ -41,12 +41,8 @@ app.get('/messages', async (req, res) => {
         $or: [
           { type: 'message' },
           { type: 'status' },
-          {
-            $or: [
-              { type: 'private_message', to: req.headers.user },
-              { type: 'private_message', from: req.headers.user },
-            ],
-          },
+          { type: 'private_message', to: req.headers.user },
+          { type: 'private_message', from: req.headers.user },
         ],
       })
       .toArray();
@@ -118,6 +114,12 @@ app.post('/messages', async (req, res) => {
     const participant = await db.collection('participants').findOne({ name: req.headers.user });
     if (!participant) {
       res.status(404).send('Participante não encontrado');
+      return;
+    }
+
+    const to = await db.collection('participants').findOne({ name: req.body.to });
+    if (!to) {
+      res.status(404).send('Destinatário não encontrado');
       return;
     }
 
@@ -193,4 +195,4 @@ async function updateParticipants() {
   }
 }
 
-setInterval(updateParticipants, 1000);
+// setInterval(updateParticipants, 1000);
