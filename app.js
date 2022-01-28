@@ -4,6 +4,7 @@ import { MongoClient, ObjectId } from 'mongodb';
 import dotenv from 'dotenv';
 import dayjs from 'dayjs';
 import Joi from 'joi';
+import { stripHtml } from 'string-strip-html';
 
 const app = express();
 app.use(cors());
@@ -69,7 +70,9 @@ app.post('/participants', async (req, res) => {
     await mongoClient.connect();
     db = mongoClient.db('bate-papo-uol-API');
 
-    const isCreated = await db.collection('participants').findOne({ name: req.body.name });
+    const name = stripHtml(req.body.name).result.trim();
+
+    const isCreated = await db.collection('participants').findOne({ name });
 
     if (isCreated) {
       res.status(409).send('Este nome já está sendo utilizado');
@@ -79,12 +82,12 @@ app.post('/participants', async (req, res) => {
     const date = Date.now();
 
     await db.collection('participants').insertOne({
-      name: req.body.name,
+      name,
       lastStatus: date,
     });
 
     await db.collection('messages').insertOne({
-      from: req.body.name,
+      from: name,
       to: 'Todos',
       text: 'entra na sala...',
       type: 'status',
@@ -133,7 +136,7 @@ app.post('/messages', async (req, res) => {
 
     await db
       .collection('messages')
-      .insertOne({ ...message, time: dayjs(Date.now()).format('HH:mm:ss') });
+      .insertOne({ ...sanitizeObject(message), time: dayjs(Date.now()).format('HH:mm:ss') });
     res.sendStatus(201);
   } catch {
     res.sendStatus(500);
@@ -193,6 +196,12 @@ async function updateParticipants() {
   } catch (error) {
     console.log(error);
   }
+}
+
+function sanitizeObject(object) {
+  Object.keys(object).forEach((key) => (object[key] = stripHtml(object[key]).result.trim()));
+
+  return object;
 }
 
 // setInterval(updateParticipants, 1000);
