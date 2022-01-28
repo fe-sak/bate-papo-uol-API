@@ -138,3 +138,32 @@ app.post('/messages', async (req, res) => {
     mongoClient.close();
   }
 });
+
+app.post('/status', async (req, res) => {
+  try {
+    await mongoClient.connect();
+    db = mongoClient.db('bate-papo-uol-API');
+
+    const filter = { name: req.headers.user };
+
+    const participant = await db.collection('participants').findOne(filter);
+    if (!participant) {
+      res.sendStatus(404);
+      return;
+    }
+
+    const updateDoc = {
+      $set: {
+        lastStatus: Date.now(),
+      },
+    };
+
+    await db.collection('participants').updateOne(filter, updateDoc);
+
+    res.sendStatus(200);
+  } catch {
+    res.sendStatus(500);
+  } finally {
+    mongoClient.close();
+  }
+});
