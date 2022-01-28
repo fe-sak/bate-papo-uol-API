@@ -30,6 +30,34 @@ app.get('/participants', async (req, res) => {
   }
 });
 
+app.get('/messages', async (req, res) => {
+  try {
+    await mongoClient.connect();
+    db = mongoClient.db('bate-papo-uol-API');
+
+    let messages = await db
+      .collection('messages')
+      .find({
+        $or: [
+          { type: 'message' },
+          {
+            $or: [
+              { type: 'private_message', to: req.headers.user },
+              { type: 'private_message', from: req.headers.user },
+            ],
+          },
+        ],
+      })
+      .toArray();
+
+    messages = messages.slice(req.query.limit ? parseInt(req.query.limit) * -1 : 0);
+    res.send(messages);
+  } catch {
+    res.sendStatus(500);
+  } finally {
+  }
+});
+
 app.post('/participants', async (req, res) => {
   const participantSchema = Joi.object({
     name: Joi.string().required(),
@@ -46,7 +74,7 @@ app.post('/participants', async (req, res) => {
 
     const isCreated = await db.collection('participants').findOne({ name: req.body.name });
 
-    if (!isCreated) {
+    if (isCreated) {
       res.status(409).send('Este nome já está sendo utilizado');
       return;
     }
