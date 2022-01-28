@@ -55,5 +55,21 @@ app.post('/participants', async (req, res) => {
     res.sendStatus(201);
   } catch {
     res.sendStatus(500);
+  } finally {
+    mongoClient.close();
+  }
+});
+
+app.get('/participants', async (req, res) => {
+  try {
+    await mongoClient.connect();
+    db = mongoClient.db('bate-papo-uol-API');
+
+    const participants = await db.collection('participants').find({}).toArray();
+    res.send(participants);
+  } catch {
+    res.sendStatus(500);
+  } finally {
+    mongoClient.close();
   }
 });
