@@ -16,6 +16,20 @@ let db;
 
 app.listen('5000', () => console.log('port 5000 listen'));
 
+app.get('/participants', async (req, res) => {
+  try {
+    await mongoClient.connect();
+    db = mongoClient.db('bate-papo-uol-API');
+
+    const participants = await db.collection('participants').find({}).toArray();
+    res.send(participants);
+  } catch {
+    res.sendStatus(500);
+  } finally {
+    mongoClient.close();
+  }
+});
+
 app.post('/participants', async (req, res) => {
   const participantSchema = Joi.object({
     name: Joi.string().required(),
@@ -32,19 +46,19 @@ app.post('/participants', async (req, res) => {
 
     const isCreated = await db.collection('participants').findOne({ name: req.body.name });
 
-    if (isCreated !== null) {
+    if (!isCreated) {
       res.status(409).send('Este nome já está sendo utilizado');
       return;
     }
 
     const date = Date.now();
 
-    db.collection('participants').insertOne({
+    await db.collection('participants').insertOne({
       name: req.body.name,
       lastStatus: date,
     });
 
-    db.collection('messages').insertOne({
+    await db.collection('messages').insertOne({
       from: req.body.name,
       to: 'Todos',
       text: 'entra na sala...',
@@ -60,13 +74,36 @@ app.post('/participants', async (req, res) => {
   }
 });
 
-app.get('/participants', async (req, res) => {
+app.post('/messages', async (req, res) => {
+  const messageSchema = Joi.object({
+    from: Joi.string().required(),
+    to: Joi.string().required(),
+    text: Joi.string().required(),
+    type: Joi.string().required().valid('message', 'private_message'),
+  });
+
   try {
     await mongoClient.connect();
     db = mongoClient.db('bate-papo-uol-API');
 
-    const participants = await db.collection('participants').find({}).toArray();
-    res.send(participants);
+    const participant = await db.collection('participants').findOne({ name: req.headers.user });
+    if (!participant) {
+      res.status(404).send('Participante não encontrado');
+      return;
+    }
+
+    const message = { ...req.body, from: req.headers.user };
+    const validate = messageSchema.validate(message, { abortEarly: false });
+
+    if (validate.error) {
+      res.status(422).send(validate.error.details.map((detail) => detail.message));
+      return;
+    }
+
+    await db
+      .collection('messages')
+      .insertOne({ ...message, time: dayjs(Date.now()).format('HH:mm:ss') });
+    res.sendStatus(201);
   } catch {
     res.sendStatus(500);
   } finally {
