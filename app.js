@@ -3,6 +3,7 @@ import cors from 'cors';
 import { MongoClient } from 'mongodb';
 import dotenv from 'dotenv';
 import dayjs from 'dayjs';
+import Joi from 'joi';
 
 const app = express();
 app.use(cors());
@@ -16,19 +17,28 @@ let db;
 app.listen('5000', () => console.log('port 5000 listen'));
 
 app.post('/participants', async (req, res) => {
+  const participantSchema = Joi.object({
+    name: Joi.string().required(),
+  });
+
   try {
-    if (req.body.name === '') throw 422;
+    if (participantSchema.validate(req.body).error) {
+      res.status(422).send('O nome não pode ser vazio');
+      return;
+    }
 
     await mongoClient.connect();
     db = mongoClient.db('bate-papo-uol-API');
 
-    const isCreated = await db
-      .collection('participants')
-      .findOne({ name: req.body.name });
+    const isCreated = await db.collection('participants').findOne({ name: req.body.name });
 
-    if (isCreated !== null) throw 409;
+    if (isCreated !== null) {
+      res.status(409).send('Este nome já está sendo utilizado');
+      return;
+    }
 
     const date = Date.now();
+
     db.collection('participants').insertOne({
       name: req.body.name,
       lastStatus: date,
@@ -42,16 +52,8 @@ app.post('/participants', async (req, res) => {
       time: dayjs(date).format('HH:mm:ss'),
     });
 
-    // db.collection('participants')
-    //   .find()
-    //   .toArray()
-    //   .then((participants) => console.log(participants));
-
     res.sendStatus(201);
-  } catch (error) {
-    if (error === 422) res.status(422).send('O nome não pode ser vazio');
-    if (error === 409)
-      res.status(409).send('Este nome já está sendo utilizado');
-    else res.sendStatus(500);
+  } catch {
+    res.sendStatus(500);
   }
 });
