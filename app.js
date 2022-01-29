@@ -276,6 +276,7 @@ async function updateParticipants() {
     console.log(error);
   }
 }
+setInterval(updateParticipants, 1000);
 
 function stripAndTrim(string) {
   return stripHtml(string).result.trim();
@@ -286,5 +287,3 @@ function sanitizeObject(object) {
 
   return object;
 }
-
-setInterval(updateParticipants, 1000);
