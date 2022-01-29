@@ -22,8 +22,7 @@ app.get('/participants', async (req, res) => {
     await mongoClient.connect();
     db = mongoClient.db('bate-papo-uol-API');
 
-    const participants = await db.collection('participants').find({}).toArray();
-    res.send(participants);
+    res.send(await db.collection('participants').find({}).toArray());
   } catch {
     res.sendStatus(500);
   } finally {
@@ -61,9 +60,10 @@ app.post('/participants', async (req, res) => {
     name: Joi.string().required(),
   });
 
+  const validate = participantSchema.validate(req.body);
   try {
-    if (participantSchema.validate(req.body).error) {
-      res.status(422).send('O nome não pode ser vazio');
+    if (validate.error) {
+      res.status(422).send(validate.error.details.map((detail) => detail.message));
       return;
     }
 
@@ -165,6 +165,43 @@ app.post('/status', async (req, res) => {
     };
 
     await db.collection('participants').updateOne(filter, updateDoc);
+
+    res.sendStatus(200);
+  } catch {
+    res.sendStatus(500);
+  } finally {
+    mongoClient.close();
+  }
+});
+
+app.delete('/messages/:messageId', async (req, res) => {
+  try {
+    await mongoClient.connect();
+    db = mongoClient.db('bate-papo-uol-API');
+
+    const participant = await db.collection('participants').findOne({ name: req.headers.user });
+    if (!participant) {
+      res.sendStatus(404);
+      return;
+    }
+
+    const messageId = req.params.messageId;
+
+    if (messageId.length !== 24) {
+      res.status(404).send('Formato do Id inválido, envie um hexadecimal de 24 dígitos');
+    }
+
+    const message = await db.collection('messages').findOne({ _id: new ObjectId(messageId) });
+    if (!message) {
+      res.sendStatus(404);
+      return;
+    }
+
+    if (message.from !== stripHtml(req.headers.user).result.trim()) {
+      res.send(401);
+      return;
+    }
+    await db.collection('messages').deleteOne({ _id: new ObjectId(messageId) });
 
     res.sendStatus(200);
   } catch {
